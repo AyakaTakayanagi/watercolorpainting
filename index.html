@@ -22,6 +22,13 @@
         border-radius: 5px;
         box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
       }
+
+      #controls button {
+    width: 70px;  /* ボタンの幅を100pxに設定 */
+    height: 30px;  /* ボタンの高さを50pxに設定 */
+    font-size: 12px;  /* テキストのフォントサイズを16pxに設定 */
+    margin-top: 5px;  /* ボタン間のマージン（上）を10pxに設定 */
+  }
     </style>
   </head>
   <body>
@@ -216,11 +223,19 @@
         map = new google.maps.Map(document.getElementById('map'), mapOptions);
 
         if (navigator.geolocation) {
-          navigator.geolocation.getCurrentPosition(function(position) {
-            const pos = {
-              lat: position.coords.latitude,
-              lng: position.coords.longitude
-            };
+          
+          const geoOptions = {
+  enableHighAccuracy: true, // 高精度モードを有効化
+  maximumAge: 0, // 常に最新の位置情報を取得
+  timeout: 10000 // 10秒以内に位置情報を取得
+};
+          
+          let watchID = navigator.geolocation.watchPosition((position) => {
+          const pos = {
+            lat: position.coords.latitude,
+            lng: position.coords.longitude
+          };
+
 
             const marker = new google.maps.Marker({
               position: pos,
@@ -229,9 +244,9 @@
             });
 
             map.setCenter(pos);
-          }, function() {
-            handleLocationError(true, map.getCenter());
-          });
+}, (error) => {
+  console.error("GPSの取得に失敗しました: ", error);
+}, geoOptions);
         }
 
         map.addListener('click', (e) => {
