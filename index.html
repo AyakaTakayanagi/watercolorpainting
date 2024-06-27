@@ -1,327 +1,507 @@
 <!DOCTYPE html>
 <html>
-  <head>
-    <title>Watercolor Map Markers</title>
-    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBdwyyX_C68If8L3fkyJT2DKaAMkZlKdhk&callback=initMap" async defer></script>
-    <style>
-      #map {
-        height: 90%;
-      }
-      html, body {
-        height: 100%;
-        margin: 0;
-        padding: 0;
-      }
-      #controls {
-        position: absolute;
-        top: 10px;
-        left: 10px;
-        z-index: 5;
-        background: white;
-        padding: 10px;
-        border-radius: 5px;
-        box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-      }
+<head>
+  <title>Watercolor Map Markers</title>
+  <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBdwyyX_C68If8L3fkyJT2DKaAMkZlKdhk&callback=initMap" 
+    async defer></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <style>
+    #map {
+      height: 90%;
+    }
+    html, body {
+      height: 100%;
+      margin: 0;
+      padding: 0;
+    }
+    #controls {
+      position: fixed;
+      top: 10px;
+      left: 10px;
+      z-index: 5;
+      background: white;
+      padding: 10px;
+      border-radius: 5px;
+      box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+    }
+    #controls2 {
+      position: fixed;
+      bottom: 10px;
+      right: 10px;
+      z-index: 5;
+      background: white;
+      padding: 10px;
+      border-radius: 5px;
+    }
+    input[type="text"], select {
+      font-size: 16px; /* モバイルブラウザでの自動ズームを防ぐための最小フォントサイズ */
+    }
+    #controls2 input[type="text"] {
+      width: 100%;  /* 入力ボックスの幅をコントロール領域に合わせて100%に設定 */
+      max-width: 300px;  /* 最大幅を300pxに設定 */
+    }
+    .cloud-bubble {
+      position: relative;
+      background: #fff;
+      border: 2px solid #000;
+      border-radius: 50%;
+      padding: 10px 20px;
+      box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+      display: inline-block;
+      max-width: 200px; /* 吹き出しの最大幅を設定 */
+      text-align: center; /* テキストを中央揃え */
+    }
+    .cloud-bubble:after {
+      content: '';
+      position: absolute;
+      bottom: -20px;
+      left: 50%;
+      margin-left: -20px;
+    }
+    .gm-style-iw {
+      width: auto !important;
+      top: 0 !important;
+      left: 0 !important;
+      background: transparent !important;
+      border: none !important;
+      box-shadow: none !important;
+    }
+    .gm-style-iw-d {
+      overflow: visible !重要;
+    }
+    .gm-style-iw-c {
+      padding: 0 !重要;
+    }
+    .gm-style .gm-style-iw-t::後 {
+      display: none;
+    }
+    #controls button {
+      width: 70px;  /* ボタンの幅を100pxに設定 */
+      height: 30px;  /* ボタンの高さを50pxに設定 */
+      font-size: 12px;  /* テキストのフォントサイズを16pxに設定 */
+      margin-top: 5px;  /* ボタン間のマージン（上）を10pxに設定 */
+    }
+  </style>
+</head>
+<body onload="loadData()">
+  <div id="controls">
+    <label for="color">Choose a color:</label>
+    <select id="color">
+      <option value="rgba(0, 128, 255, 0.5)">Blue</option>
+      <option value="rgba(255, 0, 0, 0.5)">Red</option>
+      <option value="rgba(0, 255, 0, 0.5)">Green</option>
+      <option value="rgba(255, 255, 0, 0.5)">Yellow</option>
+      <option value="rgba(255, 0, 255, 0.5)">Magenta</option>
+      <option value="rgba(0, 255, 255, 0.5)">Cyan</option>
+    </select>
+    <br>
+    <button id="startButton">Start</button>
+    <button id="stopButton">Stop</button>
+  </div>
+  <div id="controls2">
+    <label for="comment">Enter comment:</label>
+    <input type="text" id="comment">
+  </div>
+  <div id="map"></div>
+  <script>
+    let map;
+    let path = [];
+    let drawing = false;
+    let marker = null;
+    let infoWindows = [];
+    let initialSet = false;
 
-      #controls button {
-    width: 70px;  /* ボタンの幅を100pxに設定 */
-    height: 30px;  /* ボタンの高さを50pxに設定 */
-    font-size: 12px;  /* テキストのフォントサイズを16pxに設定 */
-    margin-top: 5px;  /* ボタン間のマージン（上）を10pxに設定 */
-  }
-    </style>
-  </head>
-  <body>
-    <div id="controls">
-      <label for="color">Choose a color:</label>
-      <select id="color">
-        <option value="rgba(0, 128, 255, 0.5)">Blue</option>
-        <option value="rgba(255, 0, 0, 0.5)">Red</option>
-        <option value="rgba(0, 255, 0, 0.5)">Green</option>
-        <option value="rgba(255, 255, 0, 0.5)">Yellow</option>
-        <option value="rgba(255, 0, 255, 0.5)">Magenta</option>
-        <option value="rgba(0, 255, 255, 0.5)">Cyan</option>
-      </select>
-      <br>
-      <button id="startButton">Start</button>
-      <button id="stopButton">Stop</button>
-    </div>
+    // IndexedDBの初期化
+    let db;
+    const request = indexedDB.open('MapData', 1);
 
-    <div id="map"></div>
-    <script>
-      let map;
-      let path = [];
-      let drawing = false;
+    request.onupgradeneeded = function(event) {
+      db = event.target.result;
+      const objectStore = db.createObjectStore('paths', { keyPath: 'id', autoIncrement: true });
+      objectStore.createIndex('path', 'path', { unique: false });
+      objectStore.createIndex('infoWindows', 'infoWindows', { unique: false });
+    };
 
-      function initMap() {
-        const mapOptions = {
-          center: { lat: 35.6812, lng: 139.7671 },
-          zoom: 15,
-          mapTypeId: google.maps.MapTypeId.SATELLITE,
-          styles: [
-            {
-              "elementType": "geometry",
-              "stylers": [
-                {
-                  "color": "#f5f5f5"
-                }
-              ]
-            },
-            {
-              "elementType": "labels.icon",
-              "stylers": [
-                {
-                  "visibility": "off"
-                }
-              ]
-            },
-            {
-              "elementType": "labels.text.fill",
-              "stylers": [
-                {
-                  "color": "#616161"
-                }
-              ]
-            },
-            {
-              "elementType": "labels.text.stroke",
-              "stylers": [
-                {
-                  "color": "#f5f5f5"
-                }
-              ]
-            },
-            {
-              "featureType": "administrative.land_parcel",
-              "elementType": "labels.text.fill",
-              "stylers": [
-                {
-                  "color": "#bdbdbd"
-                }
-              ]
-            },
-            {
-              "featureType": "poi",
-              "elementType": "geometry",
-              "stylers": [
-                {
-                  "color": "#eeeeee"
-                }
-              ]
-            },
-            {
-              "featureType": "poi",
-              "elementType": "labels.text.fill",
-              "stylers": [
-                {
-                  "color": "#757575"
-                }
-              ]
-            },
-            {
-              "featureType": "poi.park",
-              "elementType": "geometry",
-              "stylers": [
-                {
-                  "color": "#e5e5e5"
-                }
-              ]
-            },
-            {
-              "featureType": "poi.park",
-              "elementType": "labels.text.fill",
-              "stylers": [
-                {
-                  "color": "#9e9e9e"
-                }
-              ]
-            },
-            {
-              "featureType": "road",
-              "elementType": "geometry",
-              "stylers": [
-                {
-                  "color": "#ffffff"
-                }
-              ]
-            },
-            {
-              "featureType": "road.arterial",
-              "elementType": "labels.text.fill",
-              "stylers": [
-                {
-                  "color": "#757575"
-                }
-              ]
-            },
-            {
-              "featureType": "road.highway",
-              "elementType": "geometry",
-              "stylers": [
-                {
-                  "color": "#dadada"
-                }
-              ]
-            },
-            {
-              "featureType": "road.highway",
-              "elementType": "labels.text.fill",
-              "stylers": [
-                {
-                  "color": "#616161"
-                }
-              ]
-            },
-            {
-              "featureType": "road.local",
-              "elementType": "labels.text.fill",
-              "stylers": [
-                {
-                  "color": "#9e9e9e"
-                }
-              ]
-            },
-            {
-              "featureType": "transit.line",
-              "elementType": "geometry",
-              "stylers": [
-                {
-                  "color": "#e5e5e5"
-                }
-              ]
-            },
-            {
-              "featureType": "transit.station",
-              "elementType": "geometry",
-              "stylers": [
-                {
-                  "color": "#eeeeee"
-                }
-              ]
-            },
-            {
-              "featureType": "water",
-              "elementType": "geometry",
-              "stylers": [
-                {
-                  "color": "#c9c9c9"
-                }
-              ]
-            },
-            {
-              "featureType": "water",
-              "elementType": "labels.text.fill",
-              "stylers": [
-                {
-                  "color": "#9e9e9e"
-                }
-              ]
-            }
-          ]
+    request.onsuccess = function(event) {
+      db = event.target.result;
+      loadData(); // データベースの準備ができたらデータを読み込む
+    };
+
+    request.onerror = function(event) {
+      console.error('Database error: ' + event.target.errorCode);
+    };
+
+    function initMap() {
+      const mapOptions = {
+        center: { lat: 35.6812, lng: 139.7671 },
+        zoom: 15,
+        mapTypeId: google.maps.MapTypeId.SATELLITE,
+        styles: [
+          {
+            "elementType": "geometry",
+            "stylers": [
+              {
+                "color": "#f5f5f5"
+              }
+            ]
+          },
+          {
+            "elementType": "labels.icon",
+            "stylers": [
+              {
+                "visibility": "off"
+              }
+            ]
+          },
+          {
+            "elementType": "labels.text.fill",
+            "stylers": [
+              {
+                "color": "#616161"
+              }
+            ]
+          },
+          {
+            "elementType": "labels.text.stroke",
+            "stylers": [
+              {
+                "color": "#f5f5f5"
+              }
+            ]
+          },
+          {
+            "featureType": "administrative.land_parcel",
+            "elementType": "labels.text.fill",
+            "stylers": [
+              {
+                "color": "#bdbdbd"
+              }
+            ]
+          },
+          {
+            "featureType": "poi",
+            "elementType": "geometry",
+            "stylers": [
+              {
+                "color": "#eeeeee"
+              }
+            ]
+          },
+          {
+            "featureType": "poi",
+            "elementType": "labels.text.fill",
+            "stylers": [
+              {
+                "color": "#757575"
+              }
+            ]
+          },
+          {
+            "featureType": "poi.park",
+            "elementType": "geometry",
+            "stylers": [
+              {
+                "color": "#e5e5e5"
+              }
+            ]
+          },
+          {
+            "featureType": "poi.park",
+            "elementType": "labels.text.fill",
+            "stylers": [
+              {
+                "color": "#9e9e9e"
+              }
+            ]
+          },
+          {
+            "featureType": "road",
+            "elementType": "geometry",
+            "stylers": [
+              {
+                "color": "#ffffff"
+              }
+            ]
+          },
+          {
+            "featureType": "road.arterial",
+            "elementType": "labels.text.fill",
+            "stylers": [
+              {
+                "color": "#757575"
+              }
+            ]
+          },
+          {
+            "featureType": "road.highway",
+            "elementType": "geometry",
+            "stylers": [
+              {
+                "color": "#dadada"
+              }
+            ]
+          },
+          {
+            "featureType": "road.highway",
+            "elementType": "labels.text.fill",
+            "stylers": [
+              {
+                "color": "#616161"
+              }
+            ]
+          },
+          {
+            "featureType": "road.local",
+            "elementType": "labels.text.fill",
+            "stylers": [
+              {
+                "color": "#9e9e9e"
+              }
+            ]
+          },
+          {
+            "featureType": "transit.line",
+            "elementType": "geometry",
+            "stylers": [
+              {
+                "color": "#e5e5e5"
+              }
+            ]
+          },
+          {
+            "featureType": "transit.station",
+            "elementType": "geometry",
+            "stylers": [
+              {
+                "color": "#eeeeee"
+              }
+            ]
+          },
+          {
+            "featureType": "water",
+            "elementType": "geometry",
+            "stylers": [
+              {
+                "color": "#c9c9c9"
+              }
+            ]
+          },
+          {
+            "featureType": "water",
+            "elementType": "labels.text.fill",
+            "stylers": [
+              {
+                "color": "#9e9e9e"
+              }
+            ]
+          }
+        ]
+      };
+
+      map = new google.maps.Map(document.getElementById('map'), mapOptions);
+
+      map.addListener('click', (e) => {
+        addInfoWindow(e.latLng);
+      });
+    }
+
+    function addInfoWindow(clickPosition) {
+      const comment = document.getElementById('comment').value;
+
+      const contentString = `
+        <div class="cloud-bubble">
+          ${comment}
+        </div>
+      `;
+
+      const infoWindow = new google.maps.InfoWindow({
+        content: contentString,
+        position: clickPosition,
+      });
+
+      google.maps.event.addListener(infoWindow, 'domready', function() {
+        const iwOuter = document.querySelector('.gm-style-iw');
+        if (iwOuter) {
+          iwOuter.parentNode.style.backgroundColor = 'transparent';
+          iwOuter.parentNode.style.border = 'none';
+          iwOuter.parentNode.style.boxShadow = 'none';
+        }
+      });
+
+      infoWindow.open(map);
+      infoWindows.push({ content: contentString, position: clickPosition });
+
+      saveData(); // IndexedDBにデータを保存
+    }
+
+    if (navigator.geolocation) {
+      const geoOptions = {
+        enableHighAccuracy: true,
+        maximumAge: 0,
+        timeout: 10000
+      };
+
+      navigator.geolocation.watchPosition((position) => {
+        const pos = {
+          lat: position.coords.latitude,
+          lng: position.coords.longitude
         };
 
-        map = new google.maps.Map(document.getElementById('map'), mapOptions);
-
-        if (navigator.geolocation) {
-          
-          const geoOptions = {
-  enableHighAccuracy: true, // 高精度モードを有効化
-  maximumAge: 0, // 常に最新の位置情報を取得
-  timeout: 10000 // 10秒以内に位置情報を取得
-};
-          
-          let watchID = navigator.geolocation.watchPosition((position) => {
-          const pos = {
-            lat: position.coords.latitude,
-            lng: position.coords.longitude
-          };
-
-
-            const marker = new google.maps.Marker({
-              position: pos,
-              map: map,
-              title: "現在地"
-            });
-
-            map.setCenter(pos);
-}, (error) => {
-  console.error("GPSの取得に失敗しました: ", error);
-}, geoOptions);
+        if (!marker) {
+          marker = new google.maps.Marker({
+            position: pos,
+            map: map,
+            title: "現在地"
+          });
+        } else {
+          marker.setPosition(pos);
         }
 
-        map.addListener('click', (e) => {
-          if (drawing) {
-            addWatercolorMarker(e.latLng);
-          }
-        });
+        if (!initialSet) {
+          map.setCenter(pos);
+          initialSet = true;
+        }
 
-        document.getElementById('startButton').addEventListener('click', () => {
-          path = []; // Start a new path
-          drawing = true;
-        });
+        if (drawing) {
+          addWatercolorMarker(pos);
+        }
+      }, (error) => {
+        let errorMessage = "GPSの取得に失敗しました: ";
+        switch(error.code) {
+          case error.PERMISSION_DENIED:
+            errorMessage += "ユーザーが位置情報の取得を許可しませんでした。";
+            break;
+          case error.POSITION_UNAVAILABLE:
+            errorMessage += "位置情報が利用できません。";
+            break;
+          case error.TIMEOUT:
+            errorMessage += "位置情報の取得がタイムアウトしました。";
+            break;
+          case error.UNKNOWN_ERROR:
+            errorMessage += "不明なエラーが発生しました。";
+            break;
+        }
+        console.error(errorMessage);
+        alert(errorMessage);
+      }, geoOptions);
+    } else {
+      alert("このブラウザでは位置情報がサポートされていません。");
+    }
 
-        document.getElementById('stopButton').addEventListener('click', () => {
-          drawing = false;
-        });
-      }
+    document.getElementById('startButton').addEventListener('click', () => {
+      path = [];
+      drawing = true;
+    });
 
-      function addWatercolorMarker(location) {
-        const color = document.getElementById('color').value;
-        path.push(location);
+    document.getElementById('stopButton').addEventListener('click', () => {
+      drawing = false;
+      saveData(); // IndexedDBにデータを保存
+    });
 
-        const canvas = document.createElement('canvas');
-        const size = 100;
-        canvas.width = size;
-        canvas.height = size;
-        const ctx = canvas.getContext('2d');
+    function addWatercolorMarker(location) {
+      const color = document.getElementById('color').value;
+      path.push(location);
 
-        ctx.globalCompositeOperation = 'multiply';
+      const canvas = document.createElement('canvas');
+      const size = 100;
+      canvas.width = size;
+      canvas.height = size;
+      const ctx = canvas.getContext('2d');
 
-        const gradient = ctx.createRadialGradient(size / 2, size / 2, size / 10, size / 2, size / 2, size / 2);
-        gradient.addColorStop(0, color);
-        gradient.addColorStop(0.5, 'rgba(255, 255, 255, 0.2)');
-        gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
-        ctx.fillStyle = gradient;
-        ctx.beginPath();
-        ctx.arc(size / 2, size / 2, size / 2, 0, 2 * Math.PI);
-        ctx.fill();
+      ctx.globalCompositeOperation = 'multiply';
 
-        const image = canvas.toDataURL();
+      const gradient = ctx.createRadialGradient(size / 2, size / 2, size / 10, size / 2, size / 2, size / 2);
+      gradient.addColorStop(0, color);
+      gradient.addColorStop(0.5, 'rgba(255, 255, 255, 0.2)');
+      gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
+      ctx.fillStyle = gradient;
+      ctx.beginPath();
+      ctx.arc(size / 2, size / 2, size / 2, 0, 2 * Math.PI);
+      ctx.fill();
 
-        new google.maps.Marker({
-          position: location,
-          map: map,
-          icon: {
-            url: image,
-            scaledSize: new google.maps.Size(size, size),
-            anchor: new google.maps.Point(size / 2, size / 2),
-          },
-          clickable: false
-        });
+      const image = canvas.toDataURL();
 
-        drawWatercolorPolyline();
-      }
+      new google.maps.Marker({
+        position: location,
+        map: map,
+        icon: {
+          url: image,
+          scaledSize: new google.maps.Size(size, size),
+          anchor: new google.maps.Point(size / 2, size / 2),
+        },
+        clickable: false
+      });
 
-      function drawWatercolorPolyline() {
-        const color = document.getElementById('color').value;
-        const baseOpacity = 0.02; // より薄い線にするためにベースの不透明度を低く設定
+      drawWatercolorPolyline();
+      saveData(); // データを更新するたびに保存
+    }
 
-        const numLines = 50;
-        const opacityDecrease = baseOpacity / path.length;
+    function drawWatercolorPolyline() {
+      const color = document.getElementById('color').value;
+      const baseOpacity = 0.02;
 
-        for (let i = 1; i <= numLines; i++) { // 線の数を増やしてぼかし効果を強化
-          for (let j = 0; j < path.length - 1; j++) {
-            const polyline = new google.maps.Polyline({
-              path: [path[j], path[j + 1]],
-              geodesic: true,
-              strokeColor: color,
-              strokeOpacity: baseOpacity - j * opacityDecrease,
-              strokeWeight: 1 + i * 0.4, // 線の太さをより細かく調整
-              map: map
-            });
-          }
+      const numLines = 50;
+      const opacityDecrease = baseOpacity / path.length;
+
+      for (let i = 1; i <= numLines; i++) {
+        for (let j = 0; j < path.length - 1; j++) {
+          const polyline = new google.maps.Polyline({
+            path: [path[j], path[j + 1]],
+            geodesic: true,
+            strokeColor: color,
+            strokeOpacity: baseOpacity - j * opacityDecrease,
+            strokeWeight: 1 + i * 0.4,
+            map: map
+          });
         }
       }
-    </script>
-  </body>
+    }
+
+    function saveData() {
+      const transaction = db.transaction(['paths'], 'readwrite');
+      const objectStore = transaction.objectStore('paths');
+      objectStore.clear(); // 古いデータをクリア
+      const data = {
+        path: path,
+        infoWindows: infoWindows
+      };
+      objectStore.put(data);
+    }
+
+    function loadData() {
+      const transaction = db.transaction(['paths'], 'readonly');
+      const objectStore = transaction.objectStore('paths');
+      const request = objectStore.getAll();
+
+      request.onsuccess = function(event) {
+        const result = event.target.result;
+        if (result.length > 0) {
+          const data = result[0];
+          path = data.path;
+          infoWindows = data.infoWindows;
+
+          path.forEach(location => {
+            addWatercolorMarker(location);
+          });
+
+          infoWindows.forEach(info => {
+            const infoWindow = new google.maps.InfoWindow({
+              content: info.content,
+              position: info.position
+            });
+            infoWindow.open(map);
+          });
+        }
+      };
+
+      request.onerror = function(event) {
+        console.error('Failed to load data from IndexedDB: ' + event.target.errorCode);
+      };
+    }
+
+    // 定期的にデータを保存するためのインターバル設定（10秒ごとに保存）
+    setInterval(saveData, 10000);
+
+  </script>
+</body>
 </html>
