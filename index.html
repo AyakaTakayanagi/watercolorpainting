@@ -2,8 +2,7 @@
 <html>
 <head>
   <title>Watercolor Map Markers</title>
-  <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBdwyyX_C68If8L3fkyJT2DKaAMkZlKdhk&callback=initMap" 
-    async defer></script>
+  <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBvwYKZ8vmMiOd7kxHqrBMtQojhcik3iik&callback=initMap" async defer></script>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
   <style>
     #map {
@@ -67,10 +66,10 @@
       box-shadow: none !important;
     }
     .gm-style-iw-d {
-      overflow: visible !重要;
+      overflow: visible !important;
     }
     .gm-style-iw-c {
-      padding: 0 !重要;
+      padding: 0 !important;
     }
     .gm-style .gm-style-iw-t::後 {
       display: none;
@@ -97,6 +96,14 @@
     <br>
     <button id="startButton">Start</button>
     <button id="stopButton">Stop</button>
+    <div id="penTools" style="display: none;">
+      <button onclick="startDrawing()">Start Drawing</button>
+      <button onclick="changeColor('black')">Black</button>
+      <button onclick="changeColor('red')">Red</button>
+      <button onclick="changeColor('blue')">Blue</button>
+      <button onclick="eraseDrawing()">Erase</button>
+      <button onclick="downloadPDF()">Download PDF</button>
+    </div>
   </div>
   <div id="controls2">
     <label for="comment">Enter comment:</label>
@@ -300,6 +307,27 @@
 
       map = new google.maps.Map(document.getElementById('map'), mapOptions);
 
+      // Street Viewの初期化
+      const streetViewService = new google.maps.StreetViewService();
+      const panorama = new google.maps.StreetViewPanorama(document.getElementById('map'));
+
+      map.addListener('zoom_changed', () => {
+        if (map.getZoom() > 18) {
+          const center = map.getCenter();
+          streetViewService.getPanoramaByLocation(center, 50, (data, status) => {
+            if (status === google.maps.StreetViewStatus.OK) {
+              panorama.setPano(data.location.pano);
+              panorama.setPov({
+                heading: 270,
+                pitch: 0
+              });
+              panorama.setVisible(true);
+              map.setStreetView(panorama);
+            }
+          });
+        }
+      });
+
       map.addListener('click', (e) => {
         addInfoWindow(e.latLng);
       });
@@ -330,6 +358,16 @@
 
       infoWindow.open(map);
       infoWindows.push({ content: contentString, position: clickPosition });
+
+      // ストリートビューの状態でもメモを表示
+      const panorama = map.getStreetView();
+      if (panorama.getVisible()) {
+        const marker = new google.maps.Marker({
+          position: clickPosition,
+          map: panorama,
+          title: comment
+        });
+      }
 
       saveData(); // IndexedDBにデータを保存
     }
@@ -396,7 +434,39 @@
     document.getElementById('stopButton').addEventListener('click', () => {
       drawing = false;
       saveData(); // IndexedDBにデータを保存
+      document.getElementById('penTools').style.display = 'block'; // 手書きメモ用のUIを表示
     });
+
+    function startDrawing() {
+      // 実装: 手書きメモ機能の開始
+    }
+
+    function changeColor(color) {
+      // 実装: ペンの色変更
+    }
+
+    function eraseDrawing() {
+      // 実装: 手書きメモの消去
+    }
+
+    function downloadPDF() {
+      const mapDiv = document.getElementById('map');
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      canvas.width = mapDiv.offsetWidth;
+      canvas.height = mapDiv.offsetHeight;
+      
+      // 地図を描画
+      ctx.drawImage(mapDiv, 0, 0);
+
+      // 手書きメモを描画（例: 手書きメモがcanvasに描画されていると仮定）
+      ctx.drawImage(handwritingCanvas, 0, 0);
+
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF('landscape');
+      pdf.addImage(imgData, 'PNG', 0, 0);
+      pdf.save('map.pdf');
+    }
 
     function addWatercolorMarker(location) {
       const color = document.getElementById('color').value;
