@@ -101,8 +101,8 @@
             directionsRenderer = new google.maps.DirectionsRenderer({
                 map: map,
                 polylineOptions: {
-                    strokeColor: '#0000FF', // 線の色を赤に設定
-                    strokeWeight: 6 // 線の太さを設定
+                    strokeColor: '#0000FF',
+                    strokeWeight: 6
                 }
             });
 
@@ -111,45 +111,45 @@
             canvas.width = window.innerWidth;
             canvas.height = window.innerHeight;
 
-            canvas.addEventListener('mousedown', (event) => {
+            const startDrawing = (event) => {
                 if (canDraw) {
                     isDrawing = true;
                     drawingPath = [];
                     ctx.beginPath();
                     const latLng = getLatLngFromEvent(event);
                     drawingPath.push(latLng);
-                    ctx.moveTo(event.clientX, event.clientY);
+                    ctx.moveTo(event.clientX || event.touches[0].clientX, event.clientY || event.touches[0].clientY);
                     event.preventDefault();
                 }
-            });
+            };
 
-            canvas.addEventListener('mousemove', (event) => {
+            const continueDrawing = (event) => {
                 if (isDrawing) {
                     const latLng = getLatLngFromEvent(event);
                     drawingPath.push(latLng);
-                    ctx.lineTo(event.clientX, event.clientY);
+                    ctx.lineTo(event.clientX || event.touches[0].clientX, event.clientY || event.touches[0].clientY);
                     ctx.stroke();
                     event.preventDefault();
                 }
-            });
+            };
 
-            canvas.addEventListener('mouseup', (event) => {
+            const stopDrawing = (event) => {
                 if (isDrawing) {
                     isDrawing = false;
                     ctx.closePath();
-                    allDrawingPaths.push([...drawingPath]); // 保存されたパスを保存
+                    allDrawingPaths.push([...drawingPath]);
                     event.preventDefault();
                 }
-            });
+            };
 
-            canvas.addEventListener('mouseleave', (event) => {
-                if (isDrawing) {
-                    isDrawing = false;
-                    ctx.closePath();
-                    allDrawingPaths.push([...drawingPath]); // 保存されたパスを保存
-                    event.preventDefault();
-                }
-            });
+            canvas.addEventListener('mousedown', startDrawing);
+            canvas.addEventListener('mousemove', continueDrawing);
+            canvas.addEventListener('mouseup', stopDrawing);
+            canvas.addEventListener('mouseleave', stopDrawing);
+
+            canvas.addEventListener('touchstart', startDrawing);
+            canvas.addEventListener('touchmove', continueDrawing);
+            canvas.addEventListener('touchend', stopDrawing);
 
             map.addListener('bounds_changed', () => {
                 redraw();
@@ -159,14 +159,14 @@
                 canDraw = !canDraw;
                 const button = document.getElementById('startDraw');
                 button.textContent = canDraw ? 'Disable Drawing' : 'Enable Drawing';
-                button.style.backgroundColor = canDraw ? '#FF0000' : '#00FF00'; // Change color
-                canvas.style.pointerEvents = canDraw ? 'auto' : 'none'; // Enable or disable canvas events
+                button.style.backgroundColor = canDraw ? '#FF0000' : '#00FF00';
+                canvas.style.pointerEvents = canDraw ? 'auto' : 'none';
             });
 
             document.getElementById('clearCanvas').addEventListener('click', () => {
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
                 drawingPath = [];
-                allDrawingPaths = []; // 全ての描画をクリア
+                allDrawingPaths = [];
             });
 
             document.getElementById('color-picker').addEventListener('change', (event) => {
@@ -181,7 +181,6 @@
                 calculateAndDisplayRoute();
             });
 
-            // Initialize drawing settings
             ctx.strokeStyle = document.getElementById('color-picker').value;
             ctx.lineWidth = document.getElementById('line-width').value;
         }
@@ -194,8 +193,8 @@
             );
             const worldCoordinateNW = map.getProjection().fromLatLngToPoint(nw);
             const pixelOffset = new google.maps.Point(
-                event.clientX / scale + worldCoordinateNW.x,
-                event.clientY / scale + worldCoordinateNW.y
+                (event.clientX || event.touches[0].clientX) / scale + worldCoordinateNW.x,
+                (event.clientY || event.touches[0].clientY) / scale + worldCoordinateNW.y
             );
             return map.getProjection().fromPointToLatLng(pixelOffset);
         }
